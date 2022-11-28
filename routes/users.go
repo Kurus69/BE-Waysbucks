@@ -14,8 +14,8 @@ func UserRoute(r *mux.Router) {
 	h := handlers.HandlerUser(userReposetory)
 
 	r.HandleFunc("/users", middleware.Auth(h.FindAllUser)).Methods("GET")
-	r.HandleFunc("/user/{id}", h.GetUser).Methods("GET")
+	r.HandleFunc("/user/{id}", middleware.Auth(h.GetUser)).Methods("GET")
 	r.HandleFunc("/user", h.CreateUser).Methods("POST")
-	r.HandleFunc("/user/{id}", h.UpdateUser).Methods("PATCH")
-	r.HandleFunc("/user/{id}", h.DeleteUser).Methods("DELETE")
+	r.HandleFunc("/user/{id}", middleware.Auth(h.UpdateUser)).Methods("PATCH")
+	r.HandleFunc("/user/{id}", middleware.Auth(h.DeleteUser)).Methods("DELETE")
 }

@@ -51,6 +51,15 @@ func (h *handlerAuth) Register(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(response)
 	}
 
+	dataUser, _ := h.AuthRepository.Login(request.Email)
+
+	if dataUser.Email == request.Email {
+		w.WriteHeader(http.StatusBadRequest)
+		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: "E-mail already registered"}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
 	user := models.User{
 		Username: request.Username,
 		Email:    request.Email,
@@ -94,7 +103,7 @@ func (h *handlerAuth) Login(w http.ResponseWriter, r *http.Request) {
 	user, err := h.AuthRepository.Login(user.Email)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: err.Error()}
+		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: "wrong email or password"}
 		json.NewEncoder(w).Encode(response)
 		return
 	}
@@ -109,7 +118,7 @@ func (h *handlerAuth) Login(w http.ResponseWriter, r *http.Request) {
 
 	claims := jwt.MapClaims{}
 	claims["id"] = user.ID
-	claims["username"] = user.Username
+	claims["role"] = user.Role
 	claims["exp"] = time.Now().Add(time.Hour * 10).Unix() // 2 hours expired
 
 	token, errGenerateToken := jwtToken.GenerateToken(&claims)

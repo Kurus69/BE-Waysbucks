@@ -11,7 +11,7 @@ func RunMigration() {
 		&models.User{},
 		&models.Product{},
 		&models.Toping{},
-		&models.Cart{},
+		&models.Order{},
 		&models.Transaction{},
 	)
 
