@@ -10,6 +10,7 @@ import (
 	"waysbucks/repositories"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
 )
 
@@ -23,6 +24,15 @@ func HandlerUser(UserRepository repositories.UserRepository) *handlerUser {
 
 func (h *handlerUser) FindAllUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	userInfo := r.Context().Value("userInfo").(jwt.MapClaims)
+	cekRole := userInfo["role"]
+
+	if cekRole != "admin" {
+		w.WriteHeader(http.StatusBadRequest)
+		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: "You can't Access!"}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
 
 	users, err := h.UserRepository.FindAllUser()
 
@@ -39,6 +49,15 @@ func (h *handlerUser) FindAllUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *handlerUser) GetUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
+	userInfo := r.Context().Value("userInfo").(jwt.MapClaims)
+	cekRole := userInfo["role"]
+
+	if cekRole != "admin" {
+		w.WriteHeader(http.StatusBadRequest)
+		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: "You can't Access!"}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
 
 	iduser, _ := strconv.Atoi(mux.Vars(r)["id"])
 	user, err := h.UserRepository.GetUser(iduser)
@@ -57,6 +76,15 @@ func (h *handlerUser) GetUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *handlerUser) CreateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	userInfo := r.Context().Value("userInfo").(jwt.MapClaims)
+	cekRole := userInfo["role"]
+
+	if cekRole != "admin" {
+		w.WriteHeader(http.StatusBadRequest)
+		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: "You can't Access!"}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
 
 	request := new(usersdto.CreatUserRequest)
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -98,6 +126,15 @@ func (h *handlerUser) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *handlerUser) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	userInfo := r.Context().Value("userInfo").(jwt.MapClaims)
+	cekRole := userInfo["role"]
+
+	if cekRole != "admin" {
+		w.WriteHeader(http.StatusBadRequest)
+		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: "You can't Access!"}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
 
 	request := new(usersdto.UpdateUserRequest)
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -143,6 +180,15 @@ func (h *handlerUser) UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *handlerUser) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	userInfo := r.Context().Value("userInfo").(jwt.MapClaims)
+	cekRole := userInfo["role"]
+
+	if cekRole != "admin" {
+		w.WriteHeader(http.StatusBadRequest)
+		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: "You can't Access!"}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
 
 	id, _ := strconv.Atoi(mux.Vars(r)["id"])
 	user, err := h.UserRepository.GetUser(id)
@@ -168,10 +214,9 @@ func (h *handlerUser) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 func convertResponse(u models.User) usersdto.UserResponse {
 	return usersdto.UserResponse{
-		ID:       u.ID,
-		Name:     u.Username,
-		Email:    u.Email,
-		Password: u.Password,
-		Role:     u.Role,
+		ID:    u.ID,
+		Name:  u.Username,
+		Email: u.Email,
+		Role:  u.Role,
 	}
 }

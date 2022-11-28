@@ -12,5 +12,7 @@ import (
 func TransactionRoutes(r *mux.Router) {
 	transactionRepository := repositories.RepoTransaction(connection.DB)
 	h := handlers.HandlerTransaction(transactionRepository)
-	r.HandleFunc("/transaction", middleware.Auth(h.Checkout)).Methods("POST")
+	r.HandleFunc("/transaction", middleware.Auth(h.AddTransaction)).Methods("POST")
+	r.HandleFunc("/transaction/{id}", middleware.Auth(h.CancelTransaction)).Methods("DELETE")
+	r.HandleFunc("/transaction/{id}", middleware.Auth(h.UpdateTransaction)).Methods("PATCH")
 }

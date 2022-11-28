@@ -7,23 +7,41 @@ import (
 )
 
 type TransactionRepository interface {
-	Checkout(transaction *models.Transaction) (*models.Transaction, error)
-	GetCartByUser(ID int) ([]models.Cart, error)
+	AddTransaction(transaction models.Transaction) (models.Transaction, error)
+	GetOrderByUser(ID int) ([]models.Order, error)
+	CancelTransaction(transaction models.Transaction) (models.Transaction, error)
+	GetTransaction(ID int) (models.Transaction, error)
+	UpdateTransaction(transaction models.Transaction) (models.Transaction, error)
 }
 
 func RepoTransaction(db *gorm.DB) *repository {
 	return &repository{db}
 }
 
-func (r *repository) Checkout(transaction *models.Transaction) (*models.Transaction, error) {
-	err := r.db.Create(transaction).Error
+func (r *repository) AddTransaction(transaction models.Transaction) (models.Transaction, error) {
+	err := r.db.Create(&transaction).Error
 
 	return transaction, err
 }
+func (r *repository) GetOrderByUser(ID int) ([]models.Order, error) {
+	var order []models.Order
+	err := r.db.Preload("Product").Preload("Toping").Preload("Buyyer").Where("buyyer_id = ?", ID).Find(&order).Error
 
-func (r *repository) GetCartByUser(ID int) ([]models.Cart, error) {
-	var cart []models.Cart
-	err := r.db.Preload("Buyyer").Where("buyyer_id = ?", ID).Find(&cart).Error
+	return order, err
+}
+func (r *repository) CancelTransaction(transaction models.Transaction) (models.Transaction, error) {
+	err := r.db.Delete(&transaction).Error
 
-	return cart, err
+	return transaction, err
+}
+func (r *repository) GetTransaction(ID int) (models.Transaction, error) {
+	var transaction models.Transaction
+	err := r.db.Preload("Order").Preload("Account").First(&transaction, ID).Error
+
+	return transaction, err
+}
+func (r *repository) UpdateTransaction(transaction models.Transaction) (models.Transaction, error) {
+	err := r.db.Save(&transaction).Error
+
+	return transaction, err
 }

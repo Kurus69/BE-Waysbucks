@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -19,12 +21,13 @@ type handlerProduct struct {
 	ProductRepository repositories.ProductRepository
 }
 
-var path_file = os.Getenv("PATH_FILE")
+// var path_file = os.Getenv("PATH_FILE")
 
 func HandlerProduct(ProductRepository repositories.ProductRepository) *handlerProduct {
 	return &handlerProduct{ProductRepository}
 }
 
+// for admin
 func (h *handlerProduct) FindProducts(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -36,9 +39,8 @@ func (h *handlerProduct) FindProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create Embed Path File on Image property here ...
 	for i, p := range products {
-		products[i].Image = path_file + p.Image
+		products[i].Image = os.Getenv("PATH_FILE") + p.Image
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -46,6 +48,7 @@ func (h *handlerProduct) FindProducts(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// for all
 func (h *handlerProduct) GetProduct(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -61,31 +64,37 @@ func (h *handlerProduct) GetProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	product.Image = path_file + product.Image
+	product.Image = os.Getenv("PATH_FILE") + product.Image
 
 	w.WriteHeader(http.StatusOK)
 	response := dto.SuccessResult{Code: http.StatusOK, Data: convertResponseProduct(product)}
 	json.NewEncoder(w).Encode(response)
 }
 
+// for admin
 func (h *handlerProduct) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	userInfo := r.Context().Value("userInfo").(jwt.MapClaims)
-	userId := int(userInfo["id"].(float64))
+	cekRole := userInfo["role"]
 
-	// Get dataFile from midleware and store to filename variable here ...
-	dataContex := r.Context().Value("dataFile") // add this code
-	filename := dataContex.(string)             // add this code
+	if cekRole != "admin" {
+		w.WriteHeader(http.StatusBadRequest)
+		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: "You can't Access!"}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	dataContex := r.Context().Value("dataFile")
+	filename := dataContex.(string)
 
 	price, _ := strconv.Atoi(r.FormValue("price"))
 	qty, _ := strconv.Atoi(r.FormValue("qty"))
 	request := productdto.AddProduct{
-		Title:    r.FormValue("title"),
-		Price:    price,
-		Qty:      qty,
-		Image:    filename,
-		SellerID: userId,
+		Title: r.FormValue("title"),
+		Price: price,
+		Qty:   qty,
+		Image: filename,
 	}
 
 	validation := validator.New()
@@ -98,11 +107,10 @@ func (h *handlerProduct) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	product := models.Product{
-		Title:    request.Title,
-		Price:    request.Price,
-		Qty:      request.Qty,
-		Image:    request.Image,
-		SellerID: request.SellerID,
+		Title: request.Title,
+		Price: request.Price,
+		Qty:   request.Qty,
+		Image: request.Image,
 	}
 
 	product, err = h.ProductRepository.CreateProduct(product)
@@ -115,6 +123,8 @@ func (h *handlerProduct) CreateProduct(w http.ResponseWriter, r *http.Request) {
 
 	product, _ = h.ProductRepository.GetProduct(product.ID)
 
+	product.Image = os.Getenv("PATH_FILE") + product.Image
+
 	w.WriteHeader(http.StatusOK)
 	response := dto.SuccessResult{Code: http.StatusOK, Data: product}
 	json.NewEncoder(w).Encode(response)
@@ -122,6 +132,16 @@ func (h *handlerProduct) CreateProduct(w http.ResponseWriter, r *http.Request) {
 
 func (h *handlerProduct) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+
+	userInfo := r.Context().Value("userInfo").(jwt.MapClaims)
+	cekRole := userInfo["role"]
+
+	if cekRole != "admin" {
+		w.WriteHeader(http.StatusBadRequest)
+		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: "You can't Access!"}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
 
 	id, _ := strconv.Atoi(mux.Vars(r)["id"])
 
@@ -140,14 +160,36 @@ func (h *handlerProduct) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(response)
 		return
 	}
+
+	imageFile := "./uploads/" + data.Image
+
+	_, err = os.Stat(imageFile)
+	if os.IsNotExist(err) {
+		fmt.Println(err)
+	}
+
+	err = os.Remove(imageFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	data.Image = os.Getenv("PATH_FILE") + data.Image
+
 	w.WriteHeader(http.StatusOK)
 	response := dto.SuccessResult{Code: http.StatusOK, Data: convertResponseProduct(data)}
 	json.NewEncoder(w).Encode(response)
-
 }
 
 func (h *handlerProduct) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	userInfo := r.Context().Value("userInfo").(jwt.MapClaims)
+	cekRole := userInfo["role"]
+
+	if cekRole != "admin" {
+		w.WriteHeader(http.StatusBadRequest)
+		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: "You can't Access!"}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
 
 	dataContex := r.Context().Value("dataFile") // add this code
 	filename := dataContex.(string)
@@ -196,6 +238,8 @@ func (h *handlerProduct) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	data.Image = os.Getenv("PATH_FILE") + data.Image
+
 	w.WriteHeader(http.StatusOK)
 	response := dto.SuccessResult{Code: http.StatusOK, Data: convertResponseProduct(data)}
 	json.NewEncoder(w).Encode(response)
@@ -203,12 +247,10 @@ func (h *handlerProduct) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 
 func convertResponseProduct(u models.Product) models.Product {
 	return models.Product{
-		ID:       u.ID,
-		Title:    u.Title,
-		Price:    u.Price,
-		Qty:      u.Qty,
-		Image:    u.Image,
-		SellerID: u.SellerID,
-		Seller:   u.Seller,
+		ID:    u.ID,
+		Title: u.Title,
+		Price: u.Price,
+		Qty:   u.Qty,
+		Image: u.Image,
 	}
 }
