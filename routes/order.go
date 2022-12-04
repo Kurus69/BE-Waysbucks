@@ -13,7 +13,8 @@ func OrderRoutes(r *mux.Router) {
 	orderRepository := repositories.RepositoryOrder(connection.DB)
 	h := handlers.HandlerOrder(orderRepository)
 
-	r.HandleFunc("/detailProduct/{id}", middleware.Auth(h.AddOrder)).Methods("POST")
+	r.HandleFunc("/cart", middleware.Auth(h.AddOrder)).Methods("POST")
 	r.HandleFunc("/cart/{id}", middleware.Auth(h.DeleteOrder)).Methods("DELETE")
+	r.HandleFunc("/cart/{id}", middleware.Auth(h.UpdateOrder)).Methods("PATCH")
 	r.HandleFunc("/myOrder", middleware.Auth(h.GetOrderUser)).Methods("GET")
 }

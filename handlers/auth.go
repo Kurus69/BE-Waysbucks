@@ -132,9 +132,34 @@ func (h *handlerAuth) Login(w http.ResponseWriter, r *http.Request) {
 		Username: user.Username,
 		Email:    user.Email,
 		Token:    token,
+		Role:     user.Role,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	response := dto.SuccessResult{Code: http.StatusOK, Data: loginResponse}
+	json.NewEncoder(w).Encode(response)
+}
+
+func (h *handlerAuth) CheckAuth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	userInfo := r.Context().Value("userInfo").(jwt.MapClaims)
+	userID := int(userInfo["id"].(float64))
+
+	user, err := h.AuthRepository.CekUser(userID)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: "User Not Found!"}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	userData := authdto.AuthResponse{
+		Username: user.Username,
+		Email:    user.Email,
+		Role:     user.Role,
+	}
+
+	w.WriteHeader(http.StatusOK)
+	response := dto.SuccessResult{Code: http.StatusOK, Data: userData}
 	json.NewEncoder(w).Encode(response)
 }

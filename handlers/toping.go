@@ -1,9 +1,9 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -12,6 +12,8 @@ import (
 	"waysbucks/models"
 	"waysbucks/repositories"
 
+	"github.com/cloudinary/cloudinary-go/v2"
+	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
@@ -84,14 +86,14 @@ func (h *handlerToping) CreateToping(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dataContex := r.Context().Value("dataFile")
-	filename := dataContex.(string)
+	filepath := dataContex.(string)
 
 	price, _ := strconv.Atoi(r.FormValue("price"))
 	request := topingdto.AddToping{
 		Title:  r.FormValue("title"),
-		Image:  filename,
+		Image:  filepath,
 		Price:  price,
-		Status: r.Form.Has("status"),
+		Status: true,
 	}
 
 	validation := validator.New()
@@ -103,9 +105,21 @@ func (h *handlerToping) CreateToping(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var ctx = context.Background()
+	var CLOUD_NAME = os.Getenv("CLOUD_NAME")
+	var API_KEY = os.Getenv("API_KEY")
+	var API_SECRET = os.Getenv("API_SECRET")
+
+	cld, _ := cloudinary.NewFromParams(CLOUD_NAME, API_KEY, API_SECRET)
+	resp, err := cld.Upload.Upload(ctx, filepath, uploader.UploadParams{Folder: "waysbucks"})
+
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
 	toping := models.Toping{
 		Title:  request.Title,
-		Image:  request.Image,
+		Image:  resp.SecureURL,
 		Price:  request.Price,
 		Status: request.Status,
 	}
@@ -158,20 +172,6 @@ func (h *handlerToping) DeleteToping(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	imageFile := "./uploads/" + data.Image
-
-	_, err = os.Stat(imageFile)
-	if os.IsNotExist(err) {
-		fmt.Println(err)
-	}
-
-	err = os.Remove(imageFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	data.Image = os.Getenv("PATH_FILE") + data.Image
-
 	w.WriteHeader(http.StatusOK)
 	response := dto.SuccessResult{Code: http.StatusOK, Data: data}
 	json.NewEncoder(w).Encode(response)
@@ -190,16 +190,28 @@ func (h *handlerToping) UpdateToping(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dataContex := r.Context().Value("dataFile") // add this code
-	filename := dataContex.(string)
+	dataContex := r.Context().Value("dataFile")
+	filepath := dataContex.(string)
 
 	price, _ := strconv.Atoi(r.FormValue("price"))
 
 	request := topingdto.UpdateToping{
 		Title:  r.FormValue("title"),
 		Price:  price,
-		Image:  filename,
+		Image:  filepath,
 		Status: r.Form.Has("status"),
+	}
+
+	var ctx = context.Background()
+	var CLOUD_NAME = os.Getenv("CLOUD_NAME")
+	var API_KEY = os.Getenv("API_KEY")
+	var API_SECRET = os.Getenv("API_SECRET")
+
+	cld, _ := cloudinary.NewFromParams(CLOUD_NAME, API_KEY, API_SECRET)
+	resp, err := cld.Upload.Upload(ctx, filepath, uploader.UploadParams{Folder: "waysbucks"})
+
+	if err != nil {
+		fmt.Println(err.Error())
 	}
 
 	id, _ := strconv.Atoi(mux.Vars(r)["id"])
@@ -224,7 +236,7 @@ func (h *handlerToping) UpdateToping(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if request.Image != "" {
-		toping.Image = request.Image
+		toping.Image = resp.SecureURL
 	}
 
 	data, err := h.TopingRepository.UpdateToping(toping)
@@ -240,4 +252,14 @@ func (h *handlerToping) UpdateToping(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	response := dto.SuccessResult{Code: http.StatusOK, Data: data}
 	json.NewEncoder(w).Encode(response)
+}
+
+func (h *handlerToping) UpdateStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	id, _ := strconv.Atoi(mux.Vars(r)["id"])
+	toping, _ := h.TopingRepository.GetToping(id)
+
+	h.TopingRepository.UpdateStatus(!toping.Status, toping.ID)
+	w.WriteHeader(http.StatusOK)
 }

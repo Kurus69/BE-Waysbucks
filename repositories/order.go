@@ -10,9 +10,11 @@ type OrderRepository interface {
 	OrderItem(order models.Order) (models.Order, error)
 	DelOrderItem(order models.Order) (models.Order, error)
 	GetOrder(ID int) (models.Order, error)
-	FindAllOrderUser(ID int) ([]models.Order, error)
+	FindAllOrderTransaction(ID int) ([]models.Order, error)
 	UpdateOrder(order models.Order) (models.Order, error)
 
+	RequestTransaction(transaction models.Transaction) (models.Transaction, error)
+	CheckTransactionUser(ID int) (models.Transaction, error)
 	GetProductOrder(ID int) (models.Product, error)
 	GetTopingOrder(ID []int) ([]models.Toping, error)
 }
@@ -20,7 +22,6 @@ type OrderRepository interface {
 func RepositoryOrder(db *gorm.DB) *repository {
 	return &repository{db}
 }
-
 func (r *repository) OrderItem(order models.Order) (models.Order, error) {
 	err := r.db.Create(&order).Error
 
@@ -33,13 +34,13 @@ func (r *repository) DelOrderItem(order models.Order) (models.Order, error) {
 }
 func (r *repository) GetOrder(ID int) (models.Order, error) {
 	var order models.Order
-	err := r.db.Preload("Product").Preload("Toping").Preload("Buyyer").First(&order, ID).Error
+	err := r.db.Preload("Product").Preload("Toping").First(&order, ID).Error
 
 	return order, err
 }
-func (r *repository) FindAllOrderUser(ID int) ([]models.Order, error) {
+func (r *repository) FindAllOrderTransaction(ID int) ([]models.Order, error) {
 	var order []models.Order
-	err := r.db.Preload("Product").Preload("Toping").Preload("Buyyer").Where("buyyer_id = ?", ID).Find(&order).Error
+	err := r.db.Preload("Product").Preload("Toping").Where("transaction_id = ?", ID).Find(&order).Error
 
 	return order, err
 }
@@ -59,4 +60,14 @@ func (r *repository) GetTopingOrder(ID []int) ([]models.Toping, error) {
 	err := r.db.Find(&toping, ID).Error
 
 	return toping, err
+}
+func (r *repository) RequestTransaction(transaction models.Transaction) (models.Transaction, error) {
+	err := r.db.Create(&transaction).Error
+
+	return transaction, err
+}
+func (r *repository) CheckTransactionUser(ID int) (models.Transaction, error) {
+	var transaction models.Transaction
+	err := r.db.Preload("Order").Preload("User").Where("user_id = ? AND status = ?", ID, "Pending").First(&transaction).Error
+	return transaction, err
 }

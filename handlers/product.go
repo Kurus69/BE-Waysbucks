@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -12,6 +11,10 @@ import (
 	"waysbucks/models"
 	"waysbucks/repositories"
 
+	"context"
+
+	"github.com/cloudinary/cloudinary-go/v2"
+	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
@@ -86,7 +89,7 @@ func (h *handlerProduct) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dataContex := r.Context().Value("dataFile")
-	filename := dataContex.(string)
+	filepath := dataContex.(string)
 
 	price, _ := strconv.Atoi(r.FormValue("price"))
 	qty, _ := strconv.Atoi(r.FormValue("qty"))
@@ -94,7 +97,7 @@ func (h *handlerProduct) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		Title: r.FormValue("title"),
 		Price: price,
 		Qty:   qty,
-		Image: filename,
+		Image: filepath,
 	}
 
 	validation := validator.New()
@@ -106,11 +109,25 @@ func (h *handlerProduct) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var ctx = context.Background()
+	var CLOUD_NAME = os.Getenv("CLOUD_NAME")
+	var API_KEY = os.Getenv("API_KEY")
+	var API_SECRET = os.Getenv("API_SECRET")
+
+	cld, _ := cloudinary.NewFromParams(CLOUD_NAME, API_KEY, API_SECRET)
+
+	// Upload file to Cloudinary ...
+	resp, err := cld.Upload.Upload(ctx, filepath, uploader.UploadParams{Folder: "waysbucks"})
+
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
 	product := models.Product{
 		Title: request.Title,
 		Price: request.Price,
 		Qty:   request.Qty,
-		Image: request.Image,
+		Image: resp.SecureURL,
 	}
 
 	product, err = h.ProductRepository.CreateProduct(product)
@@ -161,18 +178,10 @@ func (h *handlerProduct) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	imageFile := "./uploads/" + data.Image
+	// sourceFile := data.Image
+	// fileName := sourceFile[72:]
 
-	_, err = os.Stat(imageFile)
-	if os.IsNotExist(err) {
-		fmt.Println(err)
-	}
-
-	err = os.Remove(imageFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	data.Image = os.Getenv("PATH_FILE") + data.Image
+	// fmt.Println("File Hapus => " + fileName)
 
 	w.WriteHeader(http.StatusOK)
 	response := dto.SuccessResult{Code: http.StatusOK, Data: convertResponseProduct(data)}
@@ -181,6 +190,7 @@ func (h *handlerProduct) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 
 func (h *handlerProduct) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+
 	userInfo := r.Context().Value("userInfo").(jwt.MapClaims)
 	cekRole := userInfo["role"]
 
@@ -191,18 +201,29 @@ func (h *handlerProduct) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dataContex := r.Context().Value("dataFile") // add this code
-	filename := dataContex.(string)
+	dataContex := r.Context().Value("dataFile")
+	filepath := dataContex.(string)
 
 	price, _ := strconv.Atoi(r.FormValue("price"))
-
 	qty, _ := strconv.Atoi(r.FormValue("qty"))
 
 	request := productdto.UpdateProduct{
 		Title: r.FormValue("title"),
 		Price: price,
+		Image: filepath,
 		Qty:   qty,
-		Image: filename,
+	}
+
+	var ctx = context.Background()
+	var CLOUD_NAME = os.Getenv("CLOUD_NAME")
+	var API_KEY = os.Getenv("API_KEY")
+	var API_SECRET = os.Getenv("API_SECRET")
+
+	cld, _ := cloudinary.NewFromParams(CLOUD_NAME, API_KEY, API_SECRET)
+	resp, err := cld.Upload.Upload(ctx, filepath, uploader.UploadParams{Folder: "waysbucks"})
+
+	if err != nil {
+		fmt.Println(err.Error())
 	}
 
 	id, _ := strconv.Atoi(mux.Vars(r)["id"])
@@ -227,7 +248,7 @@ func (h *handlerProduct) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if request.Image != "" {
-		product.Image = request.Image
+		product.Image = resp.SecureURL
 	}
 
 	data, err := h.ProductRepository.UpdateProduct(product)
@@ -238,10 +259,8 @@ func (h *handlerProduct) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data.Image = os.Getenv("PATH_FILE") + data.Image
-
 	w.WriteHeader(http.StatusOK)
-	response := dto.SuccessResult{Code: http.StatusOK, Data: convertResponseProduct(data)}
+	response := dto.SuccessResult{Code: http.StatusOK, Data: data}
 	json.NewEncoder(w).Encode(response)
 }
 

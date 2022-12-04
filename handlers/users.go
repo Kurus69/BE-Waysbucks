@@ -24,15 +24,6 @@ func HandlerUser(UserRepository repositories.UserRepository) *handlerUser {
 
 func (h *handlerUser) FindAllUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	userInfo := r.Context().Value("userInfo").(jwt.MapClaims)
-	cekRole := userInfo["role"]
-
-	if cekRole != "admin" {
-		w.WriteHeader(http.StatusBadRequest)
-		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: "You can't Access!"}
-		json.NewEncoder(w).Encode(response)
-		return
-	}
 
 	users, err := h.UserRepository.FindAllUser()
 
@@ -49,15 +40,6 @@ func (h *handlerUser) FindAllUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *handlerUser) GetUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
-	userInfo := r.Context().Value("userInfo").(jwt.MapClaims)
-	cekRole := userInfo["role"]
-
-	if cekRole != "admin" {
-		w.WriteHeader(http.StatusBadRequest)
-		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: "You can't Access!"}
-		json.NewEncoder(w).Encode(response)
-		return
-	}
 
 	iduser, _ := strconv.Atoi(mux.Vars(r)["id"])
 	user, err := h.UserRepository.GetUser(iduser)

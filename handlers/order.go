@@ -2,12 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"strconv"
-	orderdto "waysbucks/dto/order"
+	"time"
 	dto "waysbucks/dto/result"
+	transactiondto "waysbucks/dto/transaction"
 	"waysbucks/models"
 	"waysbucks/repositories"
 
@@ -27,10 +27,8 @@ func HandlerOrder(OrderRepository repositories.OrderRepository) *handlerOrder {
 func (h *handlerOrder) AddOrder(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
 
-	userInfo := r.Context().Value("userInfo").(jwt.MapClaims)
-	buyyerID := int(userInfo["id"].(float64))
+	request := new(transactiondto.OrderRequest)
 
-	request := new(orderdto.AddOrder)
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: "Check dto"}
@@ -48,8 +46,7 @@ func (h *handlerOrder) AddOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, _ := strconv.Atoi(mux.Vars(r)["id"])
-	product, err := h.OrderRepository.GetProductOrder(id)
+	product, err := h.OrderRepository.GetProductOrder(request.ProductID)
 
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -73,14 +70,41 @@ func (h *handlerOrder) AddOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	var subTotal = request.Qty * (product.Price + priceTopings)
 
-	dataOrder := models.Order{
-		Qty:       request.Qty,
-		BuyyerID:  buyyerID,
-		ProductID: product.ID,
-		Toping:    topings,
-		SubTotal:  subTotal,
+	userInfo := r.Context().Value("userInfo").(jwt.MapClaims)
+	buyyerID := int(userInfo["id"].(float64))
+	// fmt.Println()
+
+	CekRequestTrans, _ := h.OrderRepository.CheckTransactionUser(buyyerID)
+
+	setTransID := int(time.Now().Unix())
+
+	var transID int
+	if CekRequestTrans.ID != 0 {
+		transID = CekRequestTrans.ID
+	} else {
+		requestTrans := models.Transaction{
+			ID:      setTransID,
+			Name:    "-",
+			Address: "-",
+			Status:  "Pending",
+			Total:   0,
+			UserID:  buyyerID,
+		}
+		transOrder, _ := h.OrderRepository.RequestTransaction(requestTrans)
+		transID = transOrder.ID
 	}
 
+	// fmt.Println(CekRequestTrans.ID)
+	// fmt.Println(transID)
+	// fmt.Println(subTotal)
+
+	dataOrder := models.Order{
+		Qty:           request.Qty,
+		ProductID:     product.ID,
+		Toping:        topings,
+		SubTotal:      subTotal,
+		TransactionID: transID,
+	}
 	order, err := h.OrderRepository.OrderItem(dataOrder)
 
 	if err != nil {
@@ -100,16 +124,6 @@ func (h *handlerOrder) AddOrder(w http.ResponseWriter, r *http.Request) {
 }
 func (h *handlerOrder) DeleteOrder(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
-	userInfo := r.Context().Value("userInfo").(jwt.MapClaims)
-	cekRole := userInfo["role"]
-
-	if cekRole != "admin" {
-		w.WriteHeader(http.StatusBadRequest)
-		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: "You Can't Access"}
-		json.NewEncoder(w).Encode(response)
-		return
-	}
 
 	id, _ := strconv.Atoi(mux.Vars(r)["id"])
 
@@ -141,16 +155,7 @@ func (h *handlerOrder) GetOrderUser(w http.ResponseWriter, r *http.Request) {
 	userInfo := r.Context().Value("userInfo").(jwt.MapClaims)
 	buyyerID := int(userInfo["id"].(float64))
 
-	cekRole := userInfo["role"]
-
-	if cekRole != "admin" {
-		w.WriteHeader(http.StatusBadRequest)
-		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: "You can't Access!"}
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
-	data, err := h.OrderRepository.FindAllOrderUser(buyyerID)
+	myTrans, err := h.OrderRepository.CheckTransactionUser(buyyerID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: err.Error()}
@@ -158,9 +163,52 @@ func (h *handlerOrder) GetOrderUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, p := range data {
-		p.Product.Image = os.Getenv("PATH_FILE") + p.Product.Image
-		fmt.Println(p.Product.Image)
+	data, err := h.OrderRepository.FindAllOrderTransaction(myTrans.ID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: err.Error()}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+	// for _, p := range data {
+	// 	p.Product.Image = os.Getenv("PATH_FILE") + p.Product.Image
+	// }
+	// fmt.Println(data)
+
+	w.WriteHeader(http.StatusOK)
+	response := dto.SuccessResult{Code: http.StatusOK, Data: data}
+	json.NewEncoder(w).Encode(response)
+}
+func (h *handlerOrder) UpdateOrder(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	request := new(transactiondto.UpdateOrder)
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: err.Error()}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	id, _ := strconv.Atoi(mux.Vars(r)["id"])
+	order, err := h.OrderRepository.GetOrder(int(id))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		response := dto.ErrorResult{Code: http.StatusBadRequest, Message: err.Error()}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	priceItem := order.SubTotal / order.Qty
+	order.Qty = request.Qty
+	order.SubTotal = priceItem * order.Qty
+
+	data, err := h.OrderRepository.UpdateOrder(order)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		response := dto.ErrorResult{Code: http.StatusInternalServerError, Message: err.Error()}
+		json.NewEncoder(w).Encode(response)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
