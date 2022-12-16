@@ -157,7 +157,7 @@ func (h *handlerTransaction) UpdateTransaction(w http.ResponseWriter, r *http.Re
 	if request.Address != "" {
 		transaction.Address = request.Address
 	}
-	transaction.Status = "Payment"
+	// transaction.Status = "Payment"
 	transaction.Total = Total
 
 	data, err := h.TransactionRepository.UpdateTransaction(transaction)
@@ -191,8 +191,6 @@ func (h *handlerTransaction) UpdateTransaction(w http.ResponseWriter, r *http.Re
 
 	var s = snap.Client{}
 	s.New(os.Getenv("SERVER_KEY"), midtrans.Sandbox)
-	// fmt.Println(os.Getenv("SERVER_KEY"))
-	// fmt.Println(os.Getenv("CLIENT_KEY"))
 
 	req := &snap.Request{
 		TransactionDetails: midtrans.TransactionDetails{
@@ -272,27 +270,18 @@ func (h *handlerTransaction) Notification(w http.ResponseWriter, r *http.Request
 
 	if transactionStatus == "capture" {
 		if fraudStatus == "challenge" {
-			// TODO set transaction status on your database to 'challenge'
-			// e.g: 'Payment status challenged. Please take action on your Merchant Administration Portal
 			h.TransactionRepository.UpdateTransactionUser("Payment", transaction.ID)
 		} else if fraudStatus == "accept" {
-			// TODO set transaction status on your database to 'success'
-			h.TransactionRepository.UpdateTransactionUser("Success", transaction.ID)
+			h.TransactionRepository.UpdateTransactionUser("Payment", transaction.ID)
 		}
 	} else if transactionStatus == "settlement" {
-		// TODO set transaction status on your databaase to 'success'
-		h.TransactionRepository.UpdateTransactionUser("Success", transaction.ID)
+		h.TransactionRepository.UpdateTransactionUser("Payment", transaction.ID)
 	} else if transactionStatus == "deny" {
-		// TODO you can ignore 'deny', because most of the time it allows payment retries
-		// and later can become success
 		h.TransactionRepository.UpdateTransactionUser("Cancel", transaction.ID)
 	} else if transactionStatus == "cancel" || transactionStatus == "expire" {
-		// TODO set transaction status on your databaase to 'failure'
 		h.TransactionRepository.UpdateTransactionUser("Cancel", transaction.ID)
 	} else if transactionStatus == "pending" {
-		// TODO set transaction status on your databaase to 'pending' / waiting payment
 		h.TransactionRepository.UpdateTransactionUser("Payment", transaction.ID)
 	}
-
 	w.WriteHeader(http.StatusOK)
 }

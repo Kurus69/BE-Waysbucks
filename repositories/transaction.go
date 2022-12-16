@@ -9,7 +9,6 @@ import (
 
 type TransactionRepository interface {
 	AddTransaction(transaction models.Transaction) (models.Transaction, error)
-	// GetOrderByUser(ID int) ([]models.Order, error)
 	CancelTransaction(transaction models.Transaction) (models.Transaction, error)
 
 	//=================================================================================
@@ -30,13 +29,6 @@ func (r *repository) AddTransaction(transaction models.Transaction) (models.Tran
 
 	return transaction, err
 }
-
-// func (r *repository) GetOrderByUser(ID int) ([]models.Order, error) {
-// 	var order []models.Order
-// 	err := r.db.Preload("Product").Preload("Toping").Preload("User").Where("transaction_id = ?", ID).Find(&order).Error
-
-//		return order, err
-//	}
 func (r *repository) CancelTransaction(transaction models.Transaction) (models.Transaction, error) {
 	err := r.db.Delete(&transaction).Error
 
@@ -75,15 +67,6 @@ func (r *repository) UpdateTransactionUser(status string, ID int) error {
 	var transaction models.Transaction
 	r.db.Preload("Order.Product").First(&transaction, ID)
 	transaction.Status = status
-	err := r.db.Save(&transaction).Error
+	err := r.db.Debug().Save(&transaction).Error
 	return err
-
-	// If is different & Status is "success" decrement product quantity
-	// if status != transaction.Status && status == "success" {
-	// 	var product models.Product
-	// 	r.db.First(&product, transaction.Product.ID)
-	// 	product.Qty = product.Qty - 1
-	// 	r.db.Save(&product)
-	// }
-
 }
